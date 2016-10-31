@@ -9,19 +9,23 @@ const moment = require('moment');
 function Search(client, msg, args)  {
     let cc;
 
-    switch (msg.guild.region) {
-        case 'brazil':
-            cc = 'BR';
-            break;
-        case 'singapore':
-            cc = 'MY';
-            break;
-        case 'sydney':
-            cc = 'AU';
-            break;
-        default:
-            cc = 'US';
-            break;
+    if(msg.guild)   {
+        switch (msg.guild.region) {
+            case 'brazil':
+                cc = 'BR';
+                break;
+            case 'singapore':
+                cc = 'MY';
+                break;
+            case 'sydney':
+                cc = 'AU';
+                break;
+            default:
+                cc = 'US';
+                break;
+        }
+    }   else    {
+        cc = 'US';
     }
 
     return rp.get({
@@ -56,10 +60,11 @@ function Search(client, msg, args)  {
             case 'Images':
                 item = res.images.value[0];
                 reply = "**" + item.name + "**\n" + item.hostPageDisplayUrl;
-                return msg.channel.sendFile(item.contentUrl, null, reply);
+                msg.channel.sendFile(item.contentUrl, null, reply);
+                return;
             case 'TimeZone':
                 item = res.timeZone.primaryCityTime;
-                reply = Promise.resolve("**" + moment(item.time).format("MMM D, YYYY HH:mm:ss A") + "** - `" + item.location + "`");
+                reply = Promise.resolve("**" + moment(item.time.substring(0, item.time.length - 1), moment.ISO_8601).format("MMM D, YYYY HH:mm:ss A") + "** - `" + item.location + "`");
                 break;
             default:
                 item = res.webPages.value[0];

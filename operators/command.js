@@ -3,15 +3,15 @@
  */
 
 /**
- * Initialize the CommandOperator factory.
+ * Initialize the Command factory.
  * @param client
  * @param msg
- * @param body
- * @returns {CommandOperator|boolean}
+ * @param [body]
+ * @returns {Command|boolean}
  */
 function cmd(client, msg, body)   {
-    if(CommandOperator.valid(client, msg, body))  {
-        return new CommandOperator(client, msg, body);
+    if(Command.isValid(msg, body))  {
+        return new Command(client, msg, body);
     }   else {
         return false;
     }
@@ -19,31 +19,46 @@ function cmd(client, msg, body)   {
 
 module.exports = cmd;
 
-const commands = {
-    add: require('../commands/add'),
-    play: require('../commands/play'),
-    stfu: require('../commands/stfu'),
-    shuffle: require('../commands/shuffle'),
-    pause: require('../commands/pause'),
-    resume: require('../commands/resume'),
-    next: require('../commands/next'),
-    ping: require('../commands/ping'),
-    imgur: require('../commands/imgur'),
-    help: require('../commands/help'),
-    boobs: require('../commands/boobs'),
-    memes: require('../commands/memes'),
-    stats: require('../commands/stats'),
-    dick: require('../commands/dick'),
-    id: require('../commands/id'),
-    born: require('../commands/born'),
-    search: require('../commands/search'),
-    insult: require('../commands/insult'),
-    catfacts: require('../commands/catfacts'),
-    listen: require('../commands/listen'),
-    say: require('../commands/say')
-};
+class Command   {
 
-class CommandOperator   {
+    static _list() {
+        return {
+            add: require('../commands/add'),
+            play: require('../commands/play'),
+            stfu: require('../commands/stfu'),
+            shuffle: require('../commands/shuffle'),
+            pause: require('../commands/pause'),
+            resume: require('../commands/resume'),
+            next: require('../commands/next'),
+            ping: require('../commands/ping'),
+            imgur: require('../commands/imgur'),
+            help: require('../commands/help'),
+            boobs: require('../commands/boobs'),
+            memes: require('../commands/memes'),
+            stats: require('../commands/stats'),
+            dick: require('../commands/dick'),
+            id: require('../commands/id'),
+            born: require('../commands/born'),
+            search: require('../commands/search'),
+            insult: require('../commands/insult'),
+            catfacts: require('../commands/catfacts'),
+            listen: require('../commands/listen'),
+            ass: require('../commands/ass'),
+            remind: require('../commands/remind'),
+            eval: require('../commands/eval'),
+            hi: require('../commands/hello'),
+            hello: require('../commands/hello'),
+            info: require('../commands/info'),
+            sanitize: require('../commands/sanitize')
+        }
+    };
+
+    static _nsfwList()   {
+        return [
+            'boobs',
+            'ass'
+        ]
+    }
 
     /**
      * @constructor
@@ -52,38 +67,41 @@ class CommandOperator   {
      * @param {string} [body] - An optional command body; if this is not provided, the command will default to the message content.
      */
     constructor(client, msg, body)  {
-        this.parsed = CommandOperator.parse(body ? body : msg.content);
+        this.parsed = Command.parse(body ? body : msg.content);
         this.client = client;
         this.msg = msg;
 
         console.log("count#command." + this.parsed[0] + "=1");
-
-        // Define commands
-        this.commands = commands;
     }
 
     /**
      * Execute the command.
+     * @param {{}} [options]
      * @returns {Promise}
      */
-    call()  {
+    call(options = {respond: true})  {
         this.msg.channel.startTyping();
 
         const self = this;
         return new Promise((resolve, reject) => {
-            const func = this.commands[this.parsed[0]];
+            const func = Command._list()[self.parsed[0]];
 
             if(typeof func !== 'function')  {
                 reject('not a function.');
             }
 
-            const exec = func(this.client, this.msg, this.parsed.slice(1));
+            const exec = func(self.client, self.msg, self.parsed.slice(1));
 
             if(typeof exec !== 'undefined') {
                 resolve(exec);
             }   else {
                 resolve();
             }
+        }).then(res => {
+            if(options.respond && typeof res == 'string') {
+                return self.msg.channel.sendMessage(res);
+            }
+            return Promise.resolve(res);
         }).then(res => {
             self.msg.channel.stopTyping();
             return res;
@@ -95,41 +113,57 @@ class CommandOperator   {
     }
 
     /**
-     * Send a response to a command.
-     * @param {string} res - The result of a command call.
-     * @see call
-     */
-    respond(res)   {
-        if (res && typeof res == 'string') {
-            this.msg.channel.sendMessage(res);
-        }
-    }
-
-    /**
      * Check if the a message is a command.  This should be called before constructing.
-     * @param {Client} client
      * @param {Message} msg
-     * @param {string} [body]
+     * @param {string} [body] - optional raw text to be evaluated as a command
      * @returns {boolean}
      */
-    static valid(client, msg, body)   {
-        const parsed = CommandOperator.parse(body ? body : msg.content);
+    static isValid(msg, body)   {
+        if(msg.author.bot)  {
+            return false;
+        }
+
+        const text = body ? body : msg.content;
+        const parsed = Command.parse(text);
+        const cmd = parsed[0];
 
         /*
-        These are valid command forms:
-        - channel name is 'pleb' OR
-        - message is a direct message OR
-        - the bot is mentioned first
+        If the command is NSFW:
+        - The message is NOT a direct message AND
+        - The author does NOT have the 'nsfw' role AND
+        - The channel is NOT named 'nsfw'
 
-        These are exclusion parameters:
-        - author is not the bot
-        - the length of the command is > 0
+        ~ The command is invalid.
          */
-        if((msg.channel.name == 'pleb' || msg.channel.guild == null || CommandOperator.mentionedFirst(msg.content)) && msg.author.id != client.user.id && parsed.length > 0)    {
-            return CommandOperator.validFunction(parsed[0]);
+        if(Command.isNSFW(cmd))   {
+            if(msg.member && !msg.member.roles.find('name', 'nsfw') && msg.channel.name != 'nsfw')   {
+                return false;
+            }
+        }
+
+        /*
+         These are valid command forms:
+         - channel name is 'pleb' OR
+         - message is a direct message OR
+         - the bot is mentioned first
+
+         These are exclusion parameters:
+         - the length of the command is > 0
+         */
+        if((msg.channel.name == 'pleb' || msg.channel.guild == null || Command.mentionedFirst(text)) && parsed.length > 0)    {
+            return Command.isValidFunction(cmd);
         }
 
         return false;
+    }
+
+    /**
+     * Check if a command is NSFW.
+     * @param {String} str
+     * @returns {boolean}
+     */
+    static isNSFW(str)  {
+        return Command._nsfwList().indexOf(str) !== -1;
     }
 
     /**
@@ -137,18 +171,18 @@ class CommandOperator   {
      * @param {string} str
      * @returns {boolean}
      */
-    static validFunction(str) {
-        return typeof commands[str] === 'function';
+    static isValidFunction(str) {
+        return typeof Command._list()[str] === 'function';
     }
 
     /**
      * Check if the bot was mentioned first.
-     * @param {string} content
+     * @param {string} msg
      * @returns {boolean}
      */
-    static mentionedFirst(content)  {
-        const parts = content.split(' ');
-        return (parts[0] === '<@' + process.env.discord_client_id + '>') || (parts[0] === '<@!' + process.env.discord_client_id + '>');
+    static mentionedFirst(msg)  {
+        const content = msg.split(' ');
+        return (content[0] === '<@' + process.env.discord_client_id + '>') || (content[0] === '<@!' + process.env.discord_client_id + '>');
     }
 
     /**
@@ -159,7 +193,7 @@ class CommandOperator   {
     static parse(msg)    {
         const parts = msg.split(' ');
 
-        if(CommandOperator.mentionedFirst(msg))    {
+        if(Command.mentionedFirst(msg))    {
             return parts.slice(1);
         }   else    {
             return parts;

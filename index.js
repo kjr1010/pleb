@@ -14,30 +14,6 @@ if(process.env.raven)   {
 
 var client = new Discord.Client();
 
-// Define commands
-const commands = {
-    add: require('./commands/add'),
-    play: require('./commands/play'),
-    stfu: require('./commands/stfu'),
-    shuffle: require('./commands/shuffle'),
-    pause: require('./commands/pause'),
-    resume: require('./commands/resume'),
-    next: require('./commands/next'),
-    ping: require('./commands/ping'),
-    imgur: require('./commands/imgur'),
-    help: require('./commands/help'),
-    boobs: require('./commands/boobs'),
-    memes: require('./commands/memes'),
-    stats: require('./commands/stats'),
-    dick: require('./commands/dick'),
-    id: require('./commands/id'),
-    born: require('./commands/born'),
-    search: require('./commands/search'),
-    insult: require('./commands/insult'),
-    catfacts: require('./commands/catfacts'),
-    listen: require('./commands/listen')
-};
-
 client.on('ready', function()   {
     console.log('Bot is ready.');
 });
@@ -62,9 +38,7 @@ client.on('guildMemberSpeaking', function(member, speaking) {
 
             const cmd = require('./operators/command')(client, msg, text.toLowerCase());
             if(cmd) {
-                cmd.call().then(res => {
-                    cmd.respond(res)
-                });
+                cmd.call();
             }
         }).catch(console.error);
     }
@@ -75,9 +49,7 @@ client.on('message', function (message) {
 
     const cmd = require('./operators/command')(client, message);
     if(cmd) {
-        cmd.call().then(res => {
-            cmd.respond(res);
-        });
+        cmd.call();
     }
 });
 
